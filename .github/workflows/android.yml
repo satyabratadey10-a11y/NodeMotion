@@ -3,8 +3,6 @@ name: Build NodeMotion
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
@@ -28,10 +26,16 @@ jobs:
           mkdir -p app/src/main/cpp/quickjs
           git clone https://github.com/bellard/quickjs.git app/src/main/cpp/quickjs
 
-      # CHANGED: We removed the 'chmod' step because you don't have the file.
-      # CHANGED: We use 'gradle' instead of './gradlew'
+      # NEW STEP: Create the Gradle Wrapper manually to fix version issues
+      - name: Generate Gradle Wrapper
+        run: gradle wrapper --gradle-version 8.2
+
+      - name: Grant Permission
+        run: chmod +x gradlew
+
+      # CHANGED: Now we use './gradlew' (the wrapper) which is safer
       - name: Build with Gradle
-        run: gradle assembleDebug --no-daemon --stacktrace
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
