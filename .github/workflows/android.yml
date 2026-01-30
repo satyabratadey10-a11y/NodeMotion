@@ -17,7 +17,7 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
@@ -26,16 +26,16 @@ jobs:
           mkdir -p app/src/main/cpp/quickjs
           git clone https://github.com/bellard/quickjs.git app/src/main/cpp/quickjs
 
-      # NEW STEP: Create the Gradle Wrapper manually to fix version issues
-      - name: Generate Gradle Wrapper
-        run: gradle wrapper --gradle-version 8.2
+      # FIX 1: We manually install Gradle 8.2 (Stable)
+      # This stops the "Welcome to Gradle 9.3.0" error
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.2
 
-      - name: Grant Permission
-        run: chmod +x gradlew
-
-      # CHANGED: Now we use './gradlew' (the wrapper) which is safer
+      # FIX 2: We use the 'gradle' command directly now that setup-gradle is running
       - name: Build with Gradle
-        run: ./gradlew assembleDebug --stacktrace
+        run: gradle assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
