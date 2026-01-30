@@ -1,4 +1,4 @@
-name: Build NodeMotion Rescue V4
+name: Build NodeMotion Rescue V5
 
 on: [push, workflow_dispatch]
 
@@ -17,16 +17,30 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # FIX: We use a NEW folder name (quickjs_engine) to avoid "already exists" errors
-      # FIX: We use '--depth 1' to make the download smaller and faster (ignoring history)
-      - name: Download QuickJS
+      # --- FIX: DIRECT DOWNLOAD (Bypasses Git Errors) ---
+      - name: Download Engine Files Manually
         run: |
+          # 1. Create the folder
           rm -rf app/src/main/cpp/quickjs_engine
-          git clone --depth 1 https://github.com/bellard/quickjs.git app/src/main/cpp/quickjs_engine
+          mkdir -p app/src/main/cpp/quickjs_engine
           
-          # DEBUG: Print the files to the log so we KNOW they are there
-          echo "--- LISTING FILES IN QUICKJS_ENGINE ---"
-          ls -R app/src/main/cpp/quickjs_engine
+          # 2. Download the 6 critical files one by one using wget
+          # This is much more reliable than git clone
+          wget -O app/src/main/cpp/quickjs_engine/quickjs.c https://raw.githubusercontent.com/bellard/quickjs/master/quickjs.c
+          wget -O app/src/main/cpp/quickjs_engine/libregexp.c https://raw.githubusercontent.com/bellard/quickjs/master/libregexp.c
+          wget -O app/src/main/cpp/quickjs_engine/libbf.c https://raw.githubusercontent.com/bellard/quickjs/master/libbf.c
+          wget -O app/src/main/cpp/quickjs_engine/cutils.c https://raw.githubusercontent.com/bellard/quickjs/master/cutils.c
+          wget -O app/src/main/cpp/quickjs_engine/libunicode.c https://raw.githubusercontent.com/bellard/quickjs/master/libunicode.c
+          wget -O app/src/main/cpp/quickjs_engine/quickjs.h https://raw.githubusercontent.com/bellard/quickjs/master/quickjs.h
+          wget -O app/src/main/cpp/quickjs_engine/cutils.h https://raw.githubusercontent.com/bellard/quickjs/master/cutils.h
+          wget -O app/src/main/cpp/quickjs_engine/libregexp.h https://raw.githubusercontent.com/bellard/quickjs/master/libregexp.h
+          wget -O app/src/main/cpp/quickjs_engine/libbf.h https://raw.githubusercontent.com/bellard/quickjs/master/libbf.h
+          wget -O app/src/main/cpp/quickjs_engine/list.h https://raw.githubusercontent.com/bellard/quickjs/master/list.h
+          wget -O app/src/main/cpp/quickjs_engine/quickjs-libc.h https://raw.githubusercontent.com/bellard/quickjs/master/quickjs-libc.h
+          
+          # 3. Prove they exist
+          echo "--- VERIFYING FILES ---"
+          ls -l app/src/main/cpp/quickjs_engine/
 
       - name: Force Rewrite Build Files
         run: |
@@ -35,25 +49,25 @@ jobs:
           echo 'android.enableJetifier=true' >> gradle.properties
           echo 'android.suppressUnsupportedCompileSdk=34' >> gradle.properties
 
-          # 2. Rewrite CMakeLists.txt (Updated for NEW FOLDER NAME)
+          # 2. Rewrite CMakeLists.txt (Matches the manual download folder)
           echo 'cmake_minimum_required(VERSION 3.22.1)' > app/src/main/cpp/CMakeLists.txt
           echo 'project("nodemotion")' >> app/src/main/cpp/CMakeLists.txt
-          # We use CMAKE_CURRENT_SOURCE_DIR which is safer
           echo 'set(QUICKJS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/quickjs_engine)' >> app/src/main/cpp/CMakeLists.txt
           
-          # We explicitly list the files we saw in the repo
+          # We explicitly list the files we just downloaded
           echo 'add_library(nodemotion SHARED native-lib.cpp ${QUICKJS_DIR}/quickjs.c ${QUICKJS_DIR}/libregexp.c ${QUICKJS_DIR}/libbf.c ${QUICKJS_DIR}/cutils.c ${QUICKJS_DIR}/libunicode.c)' >> app/src/main/cpp/CMakeLists.txt
           
           echo 'target_compile_definitions(nodemotion PRIVATE CONFIG_VERSION="2021-03-27")' >> app/src/main/cpp/CMakeLists.txt
+          # IMPORTANT: We add -D_GNU_SOURCE to fix missing headers in manual download
+          echo 'target_compile_definitions(nodemotion PRIVATE _GNU_SOURCE)' >> app/src/main/cpp/CMakeLists.txt
           echo 'target_include_directories(nodemotion PRIVATE ${QUICKJS_DIR})' >> app/src/main/cpp/CMakeLists.txt
           echo 'find_library(log-lib log)' >> app/src/main/cpp/CMakeLists.txt
           echo 'target_link_libraries(nodemotion ${log-lib} m)' >> app/src/main/cpp/CMakeLists.txt
 
-          # 3. Rewrite native-lib.cpp (Updated include path)
+          # 3. Rewrite native-lib.cpp
           echo '#include <jni.h>' > app/src/main/cpp/native-lib.cpp
           echo '#include <string>' >> app/src/main/cpp/native-lib.cpp
           echo '#include <android/log.h>' >> app/src/main/cpp/native-lib.cpp
-          # We include the header from the new path
           echo '#include "quickjs_engine/quickjs.h"' >> app/src/main/cpp/native-lib.cpp
           
           echo 'extern "C" JNIEXPORT jstring JNICALL Java_com_example_nodemotion_MainActivity_runScript(JNIEnv* env, jobject, jstring scriptCode) {' >> app/src/main/cpp/native-lib.cpp
@@ -106,5 +120,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NodeMotion-App-V4
+          name: NodeMotion-App-V5
           path: app/build/outputs/apk/debug/app-debug.apk
