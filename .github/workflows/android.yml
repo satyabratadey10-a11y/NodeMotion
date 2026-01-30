@@ -1,4 +1,4 @@
-name: Build NodeMotion Rescue V3
+name: Build NodeMotion Rescue V4
 
 on: [push, workflow_dispatch]
 
@@ -17,40 +17,45 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # STEP 1: CLEAN & DOWNLOAD QUICKJS CORRECTLY
-      - name: Download QuickJS Source
+      # FIX: We use a NEW folder name (quickjs_engine) to avoid "already exists" errors
+      # FIX: We use '--depth 1' to make the download smaller and faster (ignoring history)
+      - name: Download QuickJS
         run: |
-          # Delete any existing folder to prevent errors
-          rm -rf app/src/main/cpp/quickjs
-          mkdir -p app/src/main/cpp/quickjs
-          # Clone into the specific folder
-          git clone https://github.com/bellard/quickjs.git app/src/main/cpp/quickjs
+          rm -rf app/src/main/cpp/quickjs_engine
+          git clone --depth 1 https://github.com/bellard/quickjs.git app/src/main/cpp/quickjs_engine
+          
+          # DEBUG: Print the files to the log so we KNOW they are there
+          echo "--- LISTING FILES IN QUICKJS_ENGINE ---"
+          ls -R app/src/main/cpp/quickjs_engine
 
-      # STEP 2: REWRITE ALL BUILD FILES TO BE PERFECT
-      - name: Force Rewrite Build & Logic Files
+      - name: Force Rewrite Build Files
         run: |
-          # --- 1. Fix gradle.properties ---
+          # 1. Fix gradle.properties
           echo 'android.useAndroidX=true' > gradle.properties
           echo 'android.enableJetifier=true' >> gradle.properties
           echo 'android.suppressUnsupportedCompileSdk=34' >> gradle.properties
 
-          # --- 2. Fix CMakeLists.txt (The Engine Map) ---
-          # This ensures CMake knows EXACTLY where libbf.c is
+          # 2. Rewrite CMakeLists.txt (Updated for NEW FOLDER NAME)
           echo 'cmake_minimum_required(VERSION 3.22.1)' > app/src/main/cpp/CMakeLists.txt
           echo 'project("nodemotion")' >> app/src/main/cpp/CMakeLists.txt
-          echo 'set(QUICKJS_DIR ${CMAKE_SOURCE_DIR}/quickjs)' >> app/src/main/cpp/CMakeLists.txt
+          # We use CMAKE_CURRENT_SOURCE_DIR which is safer
+          echo 'set(QUICKJS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/quickjs_engine)' >> app/src/main/cpp/CMakeLists.txt
+          
+          # We explicitly list the files we saw in the repo
           echo 'add_library(nodemotion SHARED native-lib.cpp ${QUICKJS_DIR}/quickjs.c ${QUICKJS_DIR}/libregexp.c ${QUICKJS_DIR}/libbf.c ${QUICKJS_DIR}/cutils.c ${QUICKJS_DIR}/libunicode.c)' >> app/src/main/cpp/CMakeLists.txt
+          
           echo 'target_compile_definitions(nodemotion PRIVATE CONFIG_VERSION="2021-03-27")' >> app/src/main/cpp/CMakeLists.txt
           echo 'target_include_directories(nodemotion PRIVATE ${QUICKJS_DIR})' >> app/src/main/cpp/CMakeLists.txt
           echo 'find_library(log-lib log)' >> app/src/main/cpp/CMakeLists.txt
           echo 'target_link_libraries(nodemotion ${log-lib} m)' >> app/src/main/cpp/CMakeLists.txt
 
-          # --- 3. Fix native-lib.cpp (The C++ Bridge) ---
-          # We rewrite this to ensure the #include paths match the CMake config
+          # 3. Rewrite native-lib.cpp (Updated include path)
           echo '#include <jni.h>' > app/src/main/cpp/native-lib.cpp
           echo '#include <string>' >> app/src/main/cpp/native-lib.cpp
           echo '#include <android/log.h>' >> app/src/main/cpp/native-lib.cpp
-          echo '#include "quickjs.h"' >> app/src/main/cpp/native-lib.cpp
+          # We include the header from the new path
+          echo '#include "quickjs_engine/quickjs.h"' >> app/src/main/cpp/native-lib.cpp
+          
           echo 'extern "C" JNIEXPORT jstring JNICALL Java_com_example_nodemotion_MainActivity_runScript(JNIEnv* env, jobject, jstring scriptCode) {' >> app/src/main/cpp/native-lib.cpp
           echo '    const char *code = env->GetStringUTFChars(scriptCode, 0);' >> app/src/main/cpp/native-lib.cpp
           echo '    JSRuntime *rt = JS_NewRuntime();' >> app/src/main/cpp/native-lib.cpp
@@ -63,7 +68,7 @@ jobs:
           echo '    return env->NewStringUTF(finalOutput.c_str());' >> app/src/main/cpp/native-lib.cpp
           echo '}' >> app/src/main/cpp/native-lib.cpp
 
-          # --- 4. Fix build.gradle files ---
+          # 4. Rewrite Gradle Settings
           echo 'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }' > settings.gradle
           echo 'dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }' >> settings.gradle
           echo 'rootProject.name = "NodeMotion"' >> settings.gradle
@@ -92,7 +97,6 @@ jobs:
           echo '    implementation "com.google.android.material:material:1.10.0"' >> app/build.gradle
           echo '}' >> app/build.gradle
 
-      # STEP 3: BUILD
       - name: Build with Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
@@ -102,5 +106,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NodeMotion-App-V3
+          name: NodeMotion-App-V4
           path: app/build/outputs/apk/debug/app-debug.apk
