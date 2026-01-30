@@ -1,4 +1,4 @@
-name: Build NodeMotion Rescue V2
+name: Build NodeMotion Rescue V3
 
 on: [push, workflow_dispatch]
 
@@ -17,30 +17,60 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Download QuickJS
+      # STEP 1: CLEAN & DOWNLOAD QUICKJS CORRECTLY
+      - name: Download QuickJS Source
         run: |
+          # Delete any existing folder to prevent errors
+          rm -rf app/src/main/cpp/quickjs
           mkdir -p app/src/main/cpp/quickjs
+          # Clone into the specific folder
           git clone https://github.com/bellard/quickjs.git app/src/main/cpp/quickjs
 
-      # --- MAGICAL FIX SECTION ---
-      - name: Force Rewrite Build Files
+      # STEP 2: REWRITE ALL BUILD FILES TO BE PERFECT
+      - name: Force Rewrite Build & Logic Files
         run: |
-          # 1. Create gradle.properties (THIS IS THE NEW FIX)
+          # --- 1. Fix gradle.properties ---
           echo 'android.useAndroidX=true' > gradle.properties
           echo 'android.enableJetifier=true' >> gradle.properties
           echo 'android.suppressUnsupportedCompileSdk=34' >> gradle.properties
-          
-          # 2. Rewrite settings.gradle
+
+          # --- 2. Fix CMakeLists.txt (The Engine Map) ---
+          # This ensures CMake knows EXACTLY where libbf.c is
+          echo 'cmake_minimum_required(VERSION 3.22.1)' > app/src/main/cpp/CMakeLists.txt
+          echo 'project("nodemotion")' >> app/src/main/cpp/CMakeLists.txt
+          echo 'set(QUICKJS_DIR ${CMAKE_SOURCE_DIR}/quickjs)' >> app/src/main/cpp/CMakeLists.txt
+          echo 'add_library(nodemotion SHARED native-lib.cpp ${QUICKJS_DIR}/quickjs.c ${QUICKJS_DIR}/libregexp.c ${QUICKJS_DIR}/libbf.c ${QUICKJS_DIR}/cutils.c ${QUICKJS_DIR}/libunicode.c)' >> app/src/main/cpp/CMakeLists.txt
+          echo 'target_compile_definitions(nodemotion PRIVATE CONFIG_VERSION="2021-03-27")' >> app/src/main/cpp/CMakeLists.txt
+          echo 'target_include_directories(nodemotion PRIVATE ${QUICKJS_DIR})' >> app/src/main/cpp/CMakeLists.txt
+          echo 'find_library(log-lib log)' >> app/src/main/cpp/CMakeLists.txt
+          echo 'target_link_libraries(nodemotion ${log-lib} m)' >> app/src/main/cpp/CMakeLists.txt
+
+          # --- 3. Fix native-lib.cpp (The C++ Bridge) ---
+          # We rewrite this to ensure the #include paths match the CMake config
+          echo '#include <jni.h>' > app/src/main/cpp/native-lib.cpp
+          echo '#include <string>' >> app/src/main/cpp/native-lib.cpp
+          echo '#include <android/log.h>' >> app/src/main/cpp/native-lib.cpp
+          echo '#include "quickjs.h"' >> app/src/main/cpp/native-lib.cpp
+          echo 'extern "C" JNIEXPORT jstring JNICALL Java_com_example_nodemotion_MainActivity_runScript(JNIEnv* env, jobject, jstring scriptCode) {' >> app/src/main/cpp/native-lib.cpp
+          echo '    const char *code = env->GetStringUTFChars(scriptCode, 0);' >> app/src/main/cpp/native-lib.cpp
+          echo '    JSRuntime *rt = JS_NewRuntime();' >> app/src/main/cpp/native-lib.cpp
+          echo '    JSContext *ctx = JS_NewContext(rt);' >> app/src/main/cpp/native-lib.cpp
+          echo '    JSValue result = JS_Eval(ctx, code, strlen(code), "<input>", JS_EVAL_TYPE_GLOBAL);' >> app/src/main/cpp/native-lib.cpp
+          echo '    const char *resultStr = JS_IsException(result) ? "Error" : JS_ToCString(ctx, result);' >> app/src/main/cpp/native-lib.cpp
+          echo '    std::string finalOutput = resultStr ? resultStr : "null";' >> app/src/main/cpp/native-lib.cpp
+          echo '    JS_FreeContext(ctx); JS_FreeRuntime(rt);' >> app/src/main/cpp/native-lib.cpp
+          echo '    env->ReleaseStringUTFChars(scriptCode, code);' >> app/src/main/cpp/native-lib.cpp
+          echo '    return env->NewStringUTF(finalOutput.c_str());' >> app/src/main/cpp/native-lib.cpp
+          echo '}' >> app/src/main/cpp/native-lib.cpp
+
+          # --- 4. Fix build.gradle files ---
           echo 'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }' > settings.gradle
           echo 'dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }' >> settings.gradle
           echo 'rootProject.name = "NodeMotion"' >> settings.gradle
           echo "include ':app'" >> settings.gradle
 
-          # 3. Rewrite Root build.gradle
           echo 'plugins { id "com.android.application" version "8.1.0" apply false }' > build.gradle
-          echo 'task clean(type: Delete) { delete rootProject.buildDir }' >> build.gradle
-
-          # 4. Rewrite App build.gradle
+          
           echo 'plugins { id "com.android.application" }' > app/build.gradle
           echo 'android {' >> app/build.gradle
           echo '    namespace "com.example.nodemotion"' >> app/build.gradle
@@ -62,7 +92,7 @@ jobs:
           echo '    implementation "com.google.android.material:material:1.10.0"' >> app/build.gradle
           echo '}' >> app/build.gradle
 
-      # --- BUILD SECTION ---
+      # STEP 3: BUILD
       - name: Build with Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
@@ -72,5 +102,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NodeMotion-App
+          name: NodeMotion-App-V3
           path: app/build/outputs/apk/debug/app-debug.apk
