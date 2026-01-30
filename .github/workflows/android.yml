@@ -1,4 +1,4 @@
-name: Build NodeMotion Rescue
+name: Build NodeMotion Rescue V2
 
 on: [push, workflow_dispatch]
 
@@ -23,21 +23,24 @@ jobs:
           git clone https://github.com/bellard/quickjs.git app/src/main/cpp/quickjs
 
       # --- MAGICAL FIX SECTION ---
-      # This step forcibly rewrites your build files to be perfect.
-      # It fixes the version mismatch errors automatically.
       - name: Force Rewrite Build Files
         run: |
-          # 1. Rewrite settings.gradle
+          # 1. Create gradle.properties (THIS IS THE NEW FIX)
+          echo 'android.useAndroidX=true' > gradle.properties
+          echo 'android.enableJetifier=true' >> gradle.properties
+          echo 'android.suppressUnsupportedCompileSdk=34' >> gradle.properties
+          
+          # 2. Rewrite settings.gradle
           echo 'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }' > settings.gradle
           echo 'dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }' >> settings.gradle
           echo 'rootProject.name = "NodeMotion"' >> settings.gradle
           echo "include ':app'" >> settings.gradle
 
-          # 2. Rewrite Root build.gradle
+          # 3. Rewrite Root build.gradle
           echo 'plugins { id "com.android.application" version "8.1.0" apply false }' > build.gradle
           echo 'task clean(type: Delete) { delete rootProject.buildDir }' >> build.gradle
 
-          # 3. Rewrite App build.gradle
+          # 4. Rewrite App build.gradle
           echo 'plugins { id "com.android.application" }' > app/build.gradle
           echo 'android {' >> app/build.gradle
           echo '    namespace "com.example.nodemotion"' >> app/build.gradle
@@ -60,7 +63,6 @@ jobs:
           echo '}' >> app/build.gradle
 
       # --- BUILD SECTION ---
-      # We use the official Gradle Action to force Version 8.2 (Stable)
       - name: Build with Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
@@ -70,5 +72,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NodeMotion-Rescue-APK
+          name: NodeMotion-App
           path: app/build/outputs/apk/debug/app-debug.apk
