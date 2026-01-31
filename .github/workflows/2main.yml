@@ -1,4 +1,4 @@
-name: Build NodeMotion Rescue V14
+name: Build NodeMotion Rescue V15
 
 on: [push, workflow_dispatch]
 
@@ -36,7 +36,7 @@ jobs:
           echo '    </application>' >> app/src/main/AndroidManifest.xml
           echo '</manifest>' >> app/src/main/AndroidManifest.xml
 
-          # 2. Update MainActivity.java (Logic Logic)
+          # 2. Update MainActivity.java
           echo 'package com.example.nodemotion;' > app/src/main/java/com/example/nodemotion/MainActivity.java
           echo 'import androidx.appcompat.app.AppCompatActivity;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo 'import android.os.Bundle;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
@@ -70,7 +70,7 @@ jobs:
           echo '        layout.setPadding(40, 40, 40, 40);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           
           echo '        TextView title = new TextView(this);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        title.setText("NodeMotion Engine v6");' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        title.setText("NodeMotion Engine (Stable)");' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '        title.setTextColor(Color.CYAN);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '        title.setTextSize(24);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '        layout.addView(title);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
@@ -99,7 +99,7 @@ jobs:
 
           echo '    private void executeEditor() {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '        if (inputPath.isEmpty()) { statusView.setText("Error: Load video first!"); return; }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        statusView.setText("Processing with FFmpeg 6.0...");' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        statusView.setText("Processing with FFmpeg 5.1...");' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           
           echo '        String jsCommand = runScript(codeInput.getText().toString());' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '        outputPath = getCacheDir() + "/output.mp4";' >> app/src/main/java/com/example/nodemotion/MainActivity.java
@@ -131,7 +131,7 @@ jobs:
           echo '    public native String runScript(String scriptCode);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '}' >> app/src/main/java/com/example/nodemotion/MainActivity.java
 
-          # 3. Update build.gradle (USE LATEST VERSION 6.0-2)
+          # 3. Update build.gradle (BACK TO 5.1 - THE SAFE CHOICE)
           echo 'plugins { id "com.android.application" }' > app/build.gradle
           echo 'android {' >> app/build.gradle
           echo '    namespace "com.example.nodemotion"' >> app/build.gradle
@@ -151,16 +151,15 @@ jobs:
           echo 'dependencies {' >> app/build.gradle
           echo '    implementation "androidx.appcompat:appcompat:1.6.1"' >> app/build.gradle
           echo '    implementation "com.google.android.material:material:1.10.0"' >> app/build.gradle
-          # WE USE 6.0-2 HERE
-          echo '    implementation "com.arthenica:ffmpeg-kit-full:6.0-2"' >> app/build.gradle
+          # USING 5.1 TO ENSURE SUCCESS
+          echo '    implementation "com.arthenica:ffmpeg-kit-full:5.1"' >> app/build.gradle
           echo '}' >> app/build.gradle
 
-          # 4. Standard Fixes
+          # 4. Standard Files
           echo 'android.useAndroidX=true' > gradle.properties
           echo 'android.enableJetifier=true' >> gradle.properties
           echo 'android.suppressUnsupportedCompileSdk=34' >> gradle.properties
           
-          # CMake: Includes ALL valid QuickJS files + dtoa.c
           echo 'cmake_minimum_required(VERSION 3.22.1)' > app/src/main/cpp/CMakeLists.txt
           echo 'project("nodemotion")' >> app/src/main/cpp/CMakeLists.txt
           echo 'set(QUICKJS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/quickjs_engine)' >> app/src/main/cpp/CMakeLists.txt
@@ -186,15 +185,10 @@ jobs:
           echo '    return env->NewStringUTF(finalOutput.c_str());' >> app/src/main/cpp/native-lib.cpp
           echo '}' >> app/src/main/cpp/native-lib.cpp
 
-          # SETTINGS: CRITICAL CHANGE! ADDED SNAPSHOT REPO
           echo 'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }' > settings.gradle
           echo 'dependencyResolutionManagement {' >> settings.gradle
           echo '    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)' >> settings.gradle
-          echo '    repositories {' >> settings.gradle
-          echo '        google()' >> settings.gradle
-          echo '        mavenCentral()' >> settings.gradle
-          echo '        maven { url "https://jitpack.io" }' >> settings.gradle
-          echo '    }' >> settings.gradle
+          echo '    repositories { google(); mavenCentral(); maven { url "https://jitpack.io" } }' >> settings.gradle
           echo '}' >> settings.gradle
           echo 'rootProject.name = "NodeMotion"' >> settings.gradle
           echo "include ':app'" >> settings.gradle
@@ -208,5 +202,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NodeMotion-App-V14-Latest
+          name: NodeMotion-App-V15-Stable
           path: app/build/outputs/apk/debug/app-debug.apk
