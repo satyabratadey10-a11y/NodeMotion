@@ -1,0 +1,114 @@
+name: Build NodeMotion Rescue V9
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # --- STEP 1: CLONE THE REPO (This link is valid) ---
+      - name: Download Engine (Git Clone)
+        run: |
+          # 1. Clean up
+          rm -rf app/src/main/cpp/quickjs_engine
+          
+          # 2. Clone the official repo (This works, as seen in your image)
+          git clone --depth 1 https://github.com/bellard/quickjs.git app/src/main/cpp/quickjs_engine
+          
+          # 3. List files to log (Proof it worked)
+          echo "--- FILES DOWNLOADED ---"
+          ls -R app/src/main/cpp/quickjs_engine
+
+      # --- STEP 2: REWRITE BUILD FILES (The "Logic" Fix) ---
+      - name: Force Rewrite Build Files
+        run: |
+          # 1. Fix gradle.properties
+          echo 'android.useAndroidX=true' > gradle.properties
+          echo 'android.enableJetifier=true' >> gradle.properties
+          echo 'android.suppressUnsupportedCompileSdk=34' >> gradle.properties
+
+          # 2. Rewrite CMakeLists.txt
+          echo 'cmake_minimum_required(VERSION 3.22.1)' > app/src/main/cpp/CMakeLists.txt
+          echo 'project("nodemotion")' >> app/src/main/cpp/CMakeLists.txt
+          echo 'set(QUICKJS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/quickjs_engine)' >> app/src/main/cpp/CMakeLists.txt
+          
+          # IMPORTANT FIX: I removed "libbf.c" because it is gone in 2026.
+          # I also added "quickjs-libc.c" which IS in your screenshot.
+          echo 'add_library(nodemotion SHARED native-lib.cpp ${QUICKJS_DIR}/quickjs.c ${QUICKJS_DIR}/libregexp.c ${QUICKJS_DIR}/cutils.c ${QUICKJS_DIR}/libunicode.c ${QUICKJS_DIR}/quickjs-libc.c)' >> app/src/main/cpp/CMakeLists.txt
+          
+          # Flags to make the new version compile
+          echo 'target_compile_definitions(nodemotion PRIVATE CONFIG_VERSION="2024-01-13")' >> app/src/main/cpp/CMakeLists.txt
+          echo 'target_compile_definitions(nodemotion PRIVATE _GNU_SOURCE)' >> app/src/main/cpp/CMakeLists.txt
+          echo 'target_include_directories(nodemotion PRIVATE ${QUICKJS_DIR})' >> app/src/main/cpp/CMakeLists.txt
+          echo 'find_library(log-lib log)' >> app/src/main/cpp/CMakeLists.txt
+          echo 'target_link_libraries(nodemotion ${log-lib} m)' >> app/src/main/cpp/CMakeLists.txt
+
+          # 3. Rewrite native-lib.cpp
+          echo '#include <jni.h>' > app/src/main/cpp/native-lib.cpp
+          echo '#include <string>' >> app/src/main/cpp/native-lib.cpp
+          echo '#include <android/log.h>' >> app/src/main/cpp/native-lib.cpp
+          echo '#include "quickjs_engine/quickjs.h"' >> app/src/main/cpp/native-lib.cpp
+          
+          echo 'extern "C" JNIEXPORT jstring JNICALL Java_com_example_nodemotion_MainActivity_runScript(JNIEnv* env, jobject, jstring scriptCode) {' >> app/src/main/cpp/native-lib.cpp
+          echo '    const char *code = env->GetStringUTFChars(scriptCode, 0);' >> app/src/main/cpp/native-lib.cpp
+          echo '    JSRuntime *rt = JS_NewRuntime();' >> app/src/main/cpp/native-lib.cpp
+          echo '    JSContext *ctx = JS_NewContext(rt);' >> app/src/main/cpp/native-lib.cpp
+          echo '    JSValue result = JS_Eval(ctx, code, strlen(code), "<input>", JS_EVAL_TYPE_GLOBAL);' >> app/src/main/cpp/native-lib.cpp
+          echo '    const char *resultStr = JS_IsException(result) ? "Error" : JS_ToCString(ctx, result);' >> app/src/main/cpp/native-lib.cpp
+          echo '    std::string finalOutput = resultStr ? resultStr : "null";' >> app/src/main/cpp/native-lib.cpp
+          echo '    JS_FreeContext(ctx); JS_FreeRuntime(rt);' >> app/src/main/cpp/native-lib.cpp
+          echo '    env->ReleaseStringUTFChars(scriptCode, code);' >> app/src/main/cpp/native-lib.cpp
+          echo '    return env->NewStringUTF(finalOutput.c_str());' >> app/src/main/cpp/native-lib.cpp
+          echo '}' >> app/src/main/cpp/native-lib.cpp
+
+          # 4. Rewrite Gradle Settings
+          echo 'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }' > settings.gradle
+          echo 'dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }' >> settings.gradle
+          echo 'rootProject.name = "NodeMotion"' >> settings.gradle
+          echo "include ':app'" >> settings.gradle
+
+          echo 'plugins { id "com.android.application" version "8.1.0" apply false }' > build.gradle
+          
+          echo 'plugins { id "com.android.application" }' > app/build.gradle
+          echo 'android {' >> app/build.gradle
+          echo '    namespace "com.example.nodemotion"' >> app/build.gradle
+          echo '    compileSdk 34' >> app/build.gradle
+          echo '    defaultConfig {' >> app/build.gradle
+          echo '        applicationId "com.example.nodemotion"' >> app/build.gradle
+          echo '        minSdk 21' >> app/build.gradle
+          echo '        targetSdk 34' >> app/build.gradle
+          echo '        versionCode 1' >> app/build.gradle
+          echo '        versionName "1.0"' >> app/build.gradle
+          echo '        externalNativeBuild { cmake { cppFlags "-std=c++11"; arguments "-DANDROID_STL=c++_shared" } }' >> app/build.gradle
+          echo '        ndk { abiFilters "armeabi-v7a", "arm64-v8a" }' >> app/build.gradle
+          echo '    }' >> app/build.gradle
+          echo '    externalNativeBuild { cmake { path "src/main/cpp/CMakeLists.txt"; version "3.22.1" } }' >> app/build.gradle
+          echo '    compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }' >> app/build.gradle
+          echo '}' >> app/build.gradle
+          echo 'dependencies {' >> app/build.gradle
+          echo '    implementation "androidx.appcompat:appcompat:1.6.1"' >> app/build.gradle
+          echo '    implementation "com.google.android.material:material:1.10.0"' >> app/build.gradle
+          echo '}' >> app/build.gradle
+
+      - name: Build with Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.2
+          arguments: assembleDebug
+      
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: NodeMotion-App-V9
+          path: app/build/outputs/apk/debug/app-debug.apk
