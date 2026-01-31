@@ -1,4 +1,4 @@
-name: Build NodeMotion Rescue V6
+name: Build NodeMotion Rescue V7
 
 on: [push, workflow_dispatch]
 
@@ -17,25 +17,27 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # --- FIX: DOWNLOAD STABLE ZIP (Guaranteed to work) ---
+      # --- FIX: DOWNLOAD STABLE ZIP (Guaranteed to contain libbf.c) ---
       - name: Download Engine (Zip Method)
         run: |
-          # 1. Clear old folder
+          # 1. Clear old folder to avoid errors
           rm -rf app/src/main/cpp/quickjs_engine
+          rm -f quickjs.zip
           rm -rf quickjs-2021-03-27
           
-          # 2. Download the STABLE release zip (Not the "master" branch)
-          # This version is guaranteed to have all the files we need.
+          # 2. Download the OFFICIAL RELEASE ZIP
+          # We use the 2021 version because we know it has libbf.c
           wget -O quickjs.zip https://github.com/bellard/quickjs/archive/refs/tags/2021-03-27.zip
           
           # 3. Unzip it
           unzip quickjs.zip
           
-          # 4. Move it to the correct folder
+          # 4. Move it to our engine folder
+          # The zip extracts to a folder named 'quickjs-2021-03-27', we rename it.
           mv quickjs-2021-03-27 app/src/main/cpp/quickjs_engine
           
-          # 5. Prove files exist
-          echo "--- FILES INSTALLED ---"
+          # 5. Prove files exist (You will see libbf.c in the logs now)
+          echo "--- VERIFYING FILES ---"
           ls -R app/src/main/cpp/quickjs_engine
 
       - name: Force Rewrite Build Files
@@ -50,7 +52,7 @@ jobs:
           echo 'project("nodemotion")' >> app/src/main/cpp/CMakeLists.txt
           echo 'set(QUICKJS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/quickjs_engine)' >> app/src/main/cpp/CMakeLists.txt
           
-          # NOTE: The stable version definitely has these files
+          # Since we use the Zip, we KNOW these files are there
           echo 'add_library(nodemotion SHARED native-lib.cpp ${QUICKJS_DIR}/quickjs.c ${QUICKJS_DIR}/libregexp.c ${QUICKJS_DIR}/libbf.c ${QUICKJS_DIR}/cutils.c ${QUICKJS_DIR}/libunicode.c)' >> app/src/main/cpp/CMakeLists.txt
           
           echo 'target_compile_definitions(nodemotion PRIVATE CONFIG_VERSION="2021-03-27")' >> app/src/main/cpp/CMakeLists.txt
@@ -115,5 +117,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NodeMotion-App-V6
+          name: NodeMotion-App-V7
           path: app/build/outputs/apk/debug/app-debug.apk
