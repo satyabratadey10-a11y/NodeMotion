@@ -1,4 +1,4 @@
-name: Build NodeMotion Rescue V15
+name: Build NodeMotion Rescue V16
 
 on: [push, workflow_dispatch]
 
@@ -17,11 +17,13 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      # --- STEP 1: DOWNLOAD JS ENGINE ---
       - name: Download JS Engine
         run: |
           rm -rf app/src/main/cpp/quickjs_engine
           git clone --depth 1 https://github.com/bellard/quickjs.git app/src/main/cpp/quickjs_engine
 
+      # --- STEP 2: REWRITE APP (Using Stable FFmpeg 5.1) ---
       - name: Force Rewrite All Files
         run: |
           # 1. Update Manifest
@@ -70,7 +72,7 @@ jobs:
           echo '        layout.setPadding(40, 40, 40, 40);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           
           echo '        TextView title = new TextView(this);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        title.setText("NodeMotion Engine (Stable)");' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        title.setText("NodeMotion Engine");' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '        title.setTextColor(Color.CYAN);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '        title.setTextSize(24);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '        layout.addView(title);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
@@ -131,7 +133,7 @@ jobs:
           echo '    public native String runScript(String scriptCode);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '}' >> app/src/main/java/com/example/nodemotion/MainActivity.java
 
-          # 3. Update build.gradle (BACK TO 5.1 - THE SAFE CHOICE)
+          # 3. Update build.gradle (USE 5.1 TO FIX BUILD)
           echo 'plugins { id "com.android.application" }' > app/build.gradle
           echo 'android {' >> app/build.gradle
           echo '    namespace "com.example.nodemotion"' >> app/build.gradle
@@ -151,15 +153,15 @@ jobs:
           echo 'dependencies {' >> app/build.gradle
           echo '    implementation "androidx.appcompat:appcompat:1.6.1"' >> app/build.gradle
           echo '    implementation "com.google.android.material:material:1.10.0"' >> app/build.gradle
-          # USING 5.1 TO ENSURE SUCCESS
           echo '    implementation "com.arthenica:ffmpeg-kit-full:5.1"' >> app/build.gradle
           echo '}' >> app/build.gradle
 
-          # 4. Standard Files
+          # 4. Standard Fixes
           echo 'android.useAndroidX=true' > gradle.properties
           echo 'android.enableJetifier=true' >> gradle.properties
           echo 'android.suppressUnsupportedCompileSdk=34' >> gradle.properties
           
+          # CMake
           echo 'cmake_minimum_required(VERSION 3.22.1)' > app/src/main/cpp/CMakeLists.txt
           echo 'project("nodemotion")' >> app/src/main/cpp/CMakeLists.txt
           echo 'set(QUICKJS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/quickjs_engine)' >> app/src/main/cpp/CMakeLists.txt
@@ -185,11 +187,9 @@ jobs:
           echo '    return env->NewStringUTF(finalOutput.c_str());' >> app/src/main/cpp/native-lib.cpp
           echo '}' >> app/src/main/cpp/native-lib.cpp
 
+          # SETTINGS
           echo 'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }' > settings.gradle
-          echo 'dependencyResolutionManagement {' >> settings.gradle
-          echo '    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)' >> settings.gradle
-          echo '    repositories { google(); mavenCentral(); maven { url "https://jitpack.io" } }' >> settings.gradle
-          echo '}' >> settings.gradle
+          echo 'dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }' >> settings.gradle
           echo 'rootProject.name = "NodeMotion"' >> settings.gradle
           echo "include ':app'" >> settings.gradle
 
@@ -202,5 +202,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NodeMotion-App-V15-Stable
+          name: NodeMotion-App-V16-Stable
           path: app/build/outputs/apk/debug/app-debug.apk
