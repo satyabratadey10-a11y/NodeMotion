@@ -1,4 +1,4 @@
-name: Build NodeMotion Rescue V7
+name: Build NodeMotion Rescue V8
 
 on: [push, workflow_dispatch]
 
@@ -17,29 +17,20 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # --- FIX: DOWNLOAD STABLE ZIP (Guaranteed to contain libbf.c) ---
-      - name: Download Engine (Zip Method)
+      # --- STEP 1: DOWNLOAD THE MASTER BRANCH (Match your screenshot) ---
+      - name: Download Engine (Git Clone)
         run: |
-          # 1. Clear old folder to avoid errors
+          # 1. Clean up old folders
           rm -rf app/src/main/cpp/quickjs_engine
-          rm -f quickjs.zip
-          rm -rf quickjs-2021-03-27
           
-          # 2. Download the OFFICIAL RELEASE ZIP
-          # We use the 2021 version because we know it has libbf.c
-          wget -O quickjs.zip https://github.com/bellard/quickjs/archive/refs/tags/2021-03-27.zip
+          # 2. Clone the LATEST version 
+          git clone --depth 1 https://github.com/bellard/quickjs.git app/src/main/cpp/quickjs_engine
           
-          # 3. Unzip it
-          unzip quickjs.zip
-          
-          # 4. Move it to our engine folder
-          # The zip extracts to a folder named 'quickjs-2021-03-27', we rename it.
-          mv quickjs-2021-03-27 app/src/main/cpp/quickjs_engine
-          
-          # 5. Prove files exist (You will see libbf.c in the logs now)
-          echo "--- VERIFYING FILES ---"
+          # 3. Verify files (We will see libbf.c is gone)
+          echo "--- FILES DOWNLOADED ---"
           ls -R app/src/main/cpp/quickjs_engine
 
+      # --- STEP 2: REWRITE BUILD FILES (THE FIX IS HERE) ---
       - name: Force Rewrite Build Files
         run: |
           # 1. Fix gradle.properties
@@ -52,10 +43,12 @@ jobs:
           echo 'project("nodemotion")' >> app/src/main/cpp/CMakeLists.txt
           echo 'set(QUICKJS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/quickjs_engine)' >> app/src/main/cpp/CMakeLists.txt
           
-          # Since we use the Zip, we KNOW these files are there
-          echo 'add_library(nodemotion SHARED native-lib.cpp ${QUICKJS_DIR}/quickjs.c ${QUICKJS_DIR}/libregexp.c ${QUICKJS_DIR}/libbf.c ${QUICKJS_DIR}/cutils.c ${QUICKJS_DIR}/libunicode.c)' >> app/src/main/cpp/CMakeLists.txt
+          # CRITICAL FIX: "libbf.c" IS REMOVED FROM THIS LIST BELOW
+          # We only include the files that actually exist in your screenshot
+          echo 'add_library(nodemotion SHARED native-lib.cpp ${QUICKJS_DIR}/quickjs.c ${QUICKJS_DIR}/libregexp.c ${QUICKJS_DIR}/cutils.c ${QUICKJS_DIR}/libunicode.c)' >> app/src/main/cpp/CMakeLists.txt
           
-          echo 'target_compile_definitions(nodemotion PRIVATE CONFIG_VERSION="2021-03-27")' >> app/src/main/cpp/CMakeLists.txt
+          # We define specific flags to make it compile without BigFloat
+          echo 'target_compile_definitions(nodemotion PRIVATE CONFIG_VERSION="2024-01-13")' >> app/src/main/cpp/CMakeLists.txt
           echo 'target_compile_definitions(nodemotion PRIVATE _GNU_SOURCE)' >> app/src/main/cpp/CMakeLists.txt
           echo 'target_include_directories(nodemotion PRIVATE ${QUICKJS_DIR})' >> app/src/main/cpp/CMakeLists.txt
           echo 'find_library(log-lib log)' >> app/src/main/cpp/CMakeLists.txt
@@ -117,5 +110,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NodeMotion-App-V7
+          name: NodeMotion-App-V8
           path: app/build/outputs/apk/debug/app-debug.apk
