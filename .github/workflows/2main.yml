@@ -1,4 +1,4 @@
-name: Build NodeMotion Rescue V9
+name: Build NodeMotion Rescue V10
 
 on: [push, workflow_dispatch]
 
@@ -17,20 +17,15 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # --- STEP 1: CLONE THE REPO (This link is valid) ---
+      # --- STEP 1: CLONE THE REPO ---
       - name: Download Engine (Git Clone)
         run: |
-          # 1. Clean up
           rm -rf app/src/main/cpp/quickjs_engine
-          
-          # 2. Clone the official repo (This works, as seen in your image)
           git clone --depth 1 https://github.com/bellard/quickjs.git app/src/main/cpp/quickjs_engine
-          
-          # 3. List files to log (Proof it worked)
           echo "--- FILES DOWNLOADED ---"
           ls -R app/src/main/cpp/quickjs_engine
 
-      # --- STEP 2: REWRITE BUILD FILES (The "Logic" Fix) ---
+      # --- STEP 2: REWRITE BUILD FILES (Added dtoa.c) ---
       - name: Force Rewrite Build Files
         run: |
           # 1. Fix gradle.properties
@@ -43,11 +38,10 @@ jobs:
           echo 'project("nodemotion")' >> app/src/main/cpp/CMakeLists.txt
           echo 'set(QUICKJS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/quickjs_engine)' >> app/src/main/cpp/CMakeLists.txt
           
-          # IMPORTANT FIX: I removed "libbf.c" because it is gone in 2026.
-          # I also added "quickjs-libc.c" which IS in your screenshot.
-          echo 'add_library(nodemotion SHARED native-lib.cpp ${QUICKJS_DIR}/quickjs.c ${QUICKJS_DIR}/libregexp.c ${QUICKJS_DIR}/cutils.c ${QUICKJS_DIR}/libunicode.c ${QUICKJS_DIR}/quickjs-libc.c)' >> app/src/main/cpp/CMakeLists.txt
+          # CRITICAL FIX: Added "${QUICKJS_DIR}/dtoa.c" to the list below!
+          # This fixes the "undefined symbol: js_dtoa" error.
+          echo 'add_library(nodemotion SHARED native-lib.cpp ${QUICKJS_DIR}/quickjs.c ${QUICKJS_DIR}/libregexp.c ${QUICKJS_DIR}/cutils.c ${QUICKJS_DIR}/libunicode.c ${QUICKJS_DIR}/quickjs-libc.c ${QUICKJS_DIR}/dtoa.c)' >> app/src/main/cpp/CMakeLists.txt
           
-          # Flags to make the new version compile
           echo 'target_compile_definitions(nodemotion PRIVATE CONFIG_VERSION="2024-01-13")' >> app/src/main/cpp/CMakeLists.txt
           echo 'target_compile_definitions(nodemotion PRIVATE _GNU_SOURCE)' >> app/src/main/cpp/CMakeLists.txt
           echo 'target_include_directories(nodemotion PRIVATE ${QUICKJS_DIR})' >> app/src/main/cpp/CMakeLists.txt
@@ -110,5 +104,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NodeMotion-App-V9
+          name: NodeMotion-App-V10
           path: app/build/outputs/apk/debug/app-debug.apk
