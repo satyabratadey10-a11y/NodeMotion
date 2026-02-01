@@ -1,4 +1,4 @@
-name: Build NodeMotion Rescue V21 (Auto-Download)
+name: Build NodeMotion Rescue V22 (Java Fix)
 
 on: [push, workflow_dispatch]
 
@@ -17,26 +17,18 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # --- STEP 1: DOWNLOAD JS ENGINE ---
       - name: Download JS Engine
         run: |
           rm -rf app/src/main/cpp/quickjs_engine
           git clone --depth 1 https://github.com/bellard/quickjs.git app/src/main/cpp/quickjs_engine
 
-      # --- STEP 2: DOWNLOAD FFMPEG FROM YOUR LINK ---
       - name: Download FFmpeg AAR (JamaisMagic)
         run: |
-          # Create the libs folder
           mkdir -p app/libs
-          
-          # Download the file from the link you provided
           echo "Downloading FFmpeg 16kb AAR..."
           wget -O app/libs/ffmpeg-kit.aar "https://github.com/JamaisMagic/ffmpeg-kit-16KB/releases/download/ffmpeg-kit-android-tls-2026-01-28T03-48-43/ffmpeg-kit-main-tls-ndk-r27-16k.aar"
-          
-          # Verify it is there
           ls -lh app/libs/
 
-      # --- STEP 3: REWRITE APP TO USE DOWNLOADED FILE ---
       - name: Force Rewrite All Files
         run: |
           # 1. Update gradle.properties
@@ -50,7 +42,7 @@ jobs:
           echo 'rootProject.name = "NodeMotion"' >> settings.gradle
           echo "include ':app'" >> settings.gradle
 
-          # 3. Update app/build.gradle (USE LOCAL FILE)
+          # 3. Update app/build.gradle
           echo 'plugins { id "com.android.application" }' > app/build.gradle
           echo 'android {' >> app/build.gradle
           echo '    namespace "com.example.nodemotion"' >> app/build.gradle
@@ -71,7 +63,6 @@ jobs:
           echo 'dependencies {' >> app/build.gradle
           echo '    implementation "androidx.appcompat:appcompat:1.6.1"' >> app/build.gradle
           echo '    implementation "com.google.android.material:material:1.10.0"' >> app/build.gradle
-          # CRITICAL: This line tells Gradle to use the file we downloaded in Step 2
           echo '    implementation files("libs/ffmpeg-kit.aar")' >> app/build.gradle
           echo '}' >> app/build.gradle
 
@@ -88,10 +79,9 @@ jobs:
           # 5. Manifest
           echo '<?xml version="1.0" encoding="utf-8"?><manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/><uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/><application android:label="NodeMotion" android:theme="@style/Theme.AppCompat.NoActionBar"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>' > app/src/main/AndroidManifest.xml
 
-          # 6. Java Logic
+          # 6. Java Logic (FIXED LINE IS HERE)
           echo 'package com.example.nodemotion;' > app/src/main/java/com/example/nodemotion/MainActivity.java
           echo 'import androidx.appcompat.app.AppCompatActivity; import android.os.Bundle; import android.widget.*; import android.net.Uri; import java.io.*;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          # IMPORTANT: We use the package from your downloaded file
           echo 'import com.arthenica.ffmpegkit.FFmpegKit; import com.arthenica.ffmpegkit.FFmpegSession; import com.arthenica.ffmpegkit.ReturnCode;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           
           echo 'public class MainActivity extends AppCompatActivity {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
@@ -107,7 +97,9 @@ jobs:
           echo '        statusView = new TextView(this); statusView.setText("Ready."); l.addView(statusView);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '    }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
 
-          echo '    private void runEditor() { if(inputPath.isEmpty()) return; String cmd = "-i "+inputPath+" "+runScript(codeInput.getText().toString())+" "+getCacheDir()+"/out.mp4"; FFmpegSession s = FFmpegKit.execute(cmd); statusView.setText(s.getReturnCode().isSuccess() ? "Success!" : "Failed"); }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          # FIX: Replaced s.getReturnCode().isSuccess() with ReturnCode.isSuccess(s.getReturnCode())
+          echo '    private void runEditor() { if(inputPath.isEmpty()) return; String cmd = "-i "+inputPath+" "+runScript(codeInput.getText().toString())+" "+getCacheDir()+"/out.mp4"; FFmpegSession s = FFmpegKit.execute(cmd); statusView.setText(ReturnCode.isSuccess(s.getReturnCode()) ? "Success!" : "Failed"); }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          
           echo '    private void copyToCache(Uri uri) { try { InputStream i=getContentResolver().openInputStream(uri); File f=new File(getCacheDir(),"in.mp4"); java.nio.file.Files.copy(i, f.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING); inputPath=f.getAbsolutePath(); statusView.setText("Loaded"); } catch(Exception e){} }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '    public native String runScript(String s);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '}' >> app/src/main/java/com/example/nodemotion/MainActivity.java
@@ -127,5 +119,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NodeMotion-App-V21-AutoDownload
+          name: NodeMotion-App-V22-Fixed
           path: app/build/outputs/apk/debug/app-debug.apk
