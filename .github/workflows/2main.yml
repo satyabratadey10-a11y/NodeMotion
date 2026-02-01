@@ -1,4 +1,4 @@
-name: Build NodeMotion Rescue V23 (Standard LTS)
+name: Build NodeMotion Rescue V26 (Classic 4.4)
 
 on: [push, workflow_dispatch]
 
@@ -17,11 +17,22 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      # --- STEP 1: DOWNLOAD JS ENGINE ---
       - name: Download JS Engine
         run: |
           rm -rf app/src/main/cpp/quickjs_engine
           git clone --depth 1 https://github.com/bellard/quickjs.git app/src/main/cpp/quickjs_engine
 
+      # --- STEP 2: DOWNLOAD YOUR SPECIFIC LINK ---
+      - name: Download MobileFFmpeg 4.4
+        run: |
+          mkdir -p app/libs
+          echo "Downloading MobileFFmpeg 4.4 LTS..."
+          # Using the specific link you provided
+          wget -O app/libs/ffmpeg.aar "https://artifactory.cronapp.io/libs-snapshot/com/arthenica/mobile-ffmpeg-full-gpl/4.4.LTS/mobile-ffmpeg-full-gpl-4.4.LTS.aar"
+          ls -lh app/libs/
+
+      # --- STEP 3: REWRITE APP FILES ---
       - name: Force Rewrite All Files
         run: |
           # 1. Update gradle.properties
@@ -31,7 +42,7 @@ jobs:
 
           # 2. Update settings.gradle
           echo 'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }' > settings.gradle
-          echo 'dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral(); maven { url "https://jitpack.io" } } }' >> settings.gradle
+          echo 'dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }' >> settings.gradle
           echo 'rootProject.name = "NodeMotion"' >> settings.gradle
           echo "include ':app'" >> settings.gradle
 
@@ -47,7 +58,6 @@ jobs:
           echo '        versionCode 1' >> app/build.gradle
           echo '        versionName "1.0"' >> app/build.gradle
           echo '        externalNativeBuild { cmake { cppFlags "-std=c++11"; arguments "-DANDROID_STL=c++_shared" } }' >> app/build.gradle
-          # FIX: Support ALL phone types (32-bit and 64-bit)
           echo '        ndk { abiFilters "armeabi-v7a", "arm64-v8a" }' >> app/build.gradle
           echo '    }' >> app/build.gradle
           echo '    externalNativeBuild { cmake { path "src/main/cpp/CMakeLists.txt"; version "3.22.1" } }' >> app/build.gradle
@@ -57,8 +67,8 @@ jobs:
           echo 'dependencies {' >> app/build.gradle
           echo '    implementation "androidx.appcompat:appcompat:1.6.1"' >> app/build.gradle
           echo '    implementation "com.google.android.material:material:1.10.0"' >> app/build.gradle
-          # FIX: Use the Standard LTS version (Compatible with Vivo Y51A)
-          echo '    implementation "com.arthenica:ffmpeg-kit-full:4.5.1-1"' >> app/build.gradle
+          # USING YOUR DOWNLOADED FILE
+          echo '    implementation files("libs/ffmpeg.aar")' >> app/build.gradle
           echo '}' >> app/build.gradle
 
           # 4. Standard C++ Setup
@@ -72,12 +82,13 @@ jobs:
           echo 'target_link_libraries(nodemotion ${log-lib} m)' >> app/src/main/cpp/CMakeLists.txt
 
           # 5. Manifest
-          echo '<?xml version="1.0" encoding="utf-8"?><manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/><uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/><application android:label="NodeMotion" android:theme="@style/Theme.AppCompat.NoActionBar"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>' > app/src/main/AndroidManifest.xml
+          echo '<?xml version="1.0" encoding="utf-8"?><manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/><uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/><application android:label="NodeMotion" android:theme="@style/Theme.AppCompat.NoActionBar" android:requestLegacyExternalStorage="true"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>' > app/src/main/AndroidManifest.xml
 
-          # 6. Java Logic (CRASH PROTECTION ADDED)
+          # 6. Java Logic (UPDATED FOR CLASSIC MOBILE-FFMPEG)
           echo 'package com.example.nodemotion;' > app/src/main/java/com/example/nodemotion/MainActivity.java
           echo 'import androidx.appcompat.app.AppCompatActivity; import android.os.Bundle; import android.widget.*; import android.net.Uri; import java.io.*;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo 'import com.arthenica.ffmpegkit.FFmpegKit; import com.arthenica.ffmpegkit.FFmpegSession; import com.arthenica.ffmpegkit.ReturnCode;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          # NOTICE: Different imports for Version 4.4
+          echo 'import com.arthenica.mobileffmpeg.FFmpeg; import com.arthenica.mobileffmpeg.Config;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           
           echo 'public class MainActivity extends AppCompatActivity {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '    static { System.loadLibrary("nodemotion"); }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
@@ -92,22 +103,8 @@ jobs:
           echo '        statusView = new TextView(this); statusView.setText("Ready."); l.addView(statusView);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '    }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
 
-          # FIX: Added try-catch block to prevent crashing if FFmpeg fails to load
-          echo '    private void runEditor() {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        if(inputPath.isEmpty()) { statusView.setText("No Video!"); return; }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        statusView.setText("Running...");' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        new Thread(() -> {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            try {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '                String script = runScript(codeInput.getText().toString());' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '                String cmd = "-i "+inputPath+" "+script+" -y "+getCacheDir()+"/out.mp4";' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '                FFmpegSession s = FFmpegKit.execute(cmd);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '                boolean success = ReturnCode.isSuccess(s.getReturnCode());' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '                runOnUiThread(() -> statusView.setText(success ? "Done!" : "Error: " + s.getOutput()));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            } catch(Exception e) {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '                runOnUiThread(() -> statusView.setText("Crash: " + e.getMessage()));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        }).start();' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '    }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          # UPDATED EXECUTION LOGIC FOR 4.4
+          echo '    private void runEditor() { if(inputPath.isEmpty()) { statusView.setText("No Video"); return; } statusView.setText("Running..."); new Thread(() -> { try { String cmd = "-i "+inputPath+" "+runScript(codeInput.getText().toString())+" -y "+getCacheDir()+"/out.mp4"; int rc = FFmpeg.execute(cmd); runOnUiThread(() -> statusView.setText(rc == Config.RETURN_CODE_SUCCESS ? "Success!" : "Failed code: " + rc)); } catch(Exception e) { runOnUiThread(() -> statusView.setText("Error: " + e.getMessage())); } }).start(); }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           
           echo '    private void copyToCache(Uri uri) { try { InputStream i=getContentResolver().openInputStream(uri); File f=new File(getCacheDir(),"in.mp4"); java.nio.file.Files.copy(i, f.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING); inputPath=f.getAbsolutePath(); statusView.setText("Loaded"); } catch(Exception e){} }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '    public native String runScript(String s);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
@@ -128,5 +125,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NodeMotion-App-V23-Stable
+          name: NodeMotion-V26-Classic
           path: app/build/outputs/apk/debug/app-debug.apk
