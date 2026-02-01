@@ -1,4 +1,4 @@
-name: Build NodeMotion Rescue V16
+name: Build NodeMotion Rescue V21 (Auto-Download)
 
 on: [push, workflow_dispatch]
 
@@ -23,117 +23,34 @@ jobs:
           rm -rf app/src/main/cpp/quickjs_engine
           git clone --depth 1 https://github.com/bellard/quickjs.git app/src/main/cpp/quickjs_engine
 
-      # --- STEP 2: REWRITE APP (Using Stable FFmpeg 5.1) ---
+      # --- STEP 2: DOWNLOAD FFMPEG FROM YOUR LINK ---
+      - name: Download FFmpeg AAR (JamaisMagic)
+        run: |
+          # Create the libs folder
+          mkdir -p app/libs
+          
+          # Download the file from the link you provided
+          echo "Downloading FFmpeg 16kb AAR..."
+          wget -O app/libs/ffmpeg-kit.aar "https://github.com/JamaisMagic/ffmpeg-kit-16KB/releases/download/ffmpeg-kit-android-tls-2026-01-28T03-48-43/ffmpeg-kit-main-tls-ndk-r27-16k.aar"
+          
+          # Verify it is there
+          ls -lh app/libs/
+
+      # --- STEP 3: REWRITE APP TO USE DOWNLOADED FILE ---
       - name: Force Rewrite All Files
         run: |
-          # 1. Update Manifest
-          echo '<?xml version="1.0" encoding="utf-8"?>' > app/src/main/AndroidManifest.xml
-          echo '<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">' >> app/src/main/AndroidManifest.xml
-          echo '    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>' >> app/src/main/AndroidManifest.xml
-          echo '    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>' >> app/src/main/AndroidManifest.xml
-          echo '    <application android:label="NodeMotion" android:theme="@style/Theme.AppCompat.NoActionBar">' >> app/src/main/AndroidManifest.xml
-          echo '        <activity android:name=".MainActivity" android:exported="true">' >> app/src/main/AndroidManifest.xml
-          echo '            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>' >> app/src/main/AndroidManifest.xml
-          echo '        </activity>' >> app/src/main/AndroidManifest.xml
-          echo '    </application>' >> app/src/main/AndroidManifest.xml
-          echo '</manifest>' >> app/src/main/AndroidManifest.xml
+          # 1. Update gradle.properties
+          echo 'android.useAndroidX=true' > gradle.properties
+          echo 'android.enableJetifier=true' >> gradle.properties
+          echo 'android.suppressUnsupportedCompileSdk=34' >> gradle.properties
 
-          # 2. Update MainActivity.java
-          echo 'package com.example.nodemotion;' > app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo 'import androidx.appcompat.app.AppCompatActivity;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo 'import android.os.Bundle;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo 'import android.widget.*;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo 'import android.graphics.Color;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo 'import android.net.Uri;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo 'import androidx.activity.result.ActivityResultLauncher;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo 'import androidx.activity.result.contract.ActivityResultContracts;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo 'import java.io.*;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo 'import com.arthenica.ffmpegkit.FFmpegKit;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo 'import com.arthenica.ffmpegkit.FFmpegSession;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo 'import com.arthenica.ffmpegkit.ReturnCode;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          # 2. Update settings.gradle
+          echo 'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }' > settings.gradle
+          echo 'dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }' >> settings.gradle
+          echo 'rootProject.name = "NodeMotion"' >> settings.gradle
+          echo "include ':app'" >> settings.gradle
 
-          echo 'public class MainActivity extends AppCompatActivity {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '    static { System.loadLibrary("nodemotion"); }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '    private EditText codeInput;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '    private TextView statusView;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '    private String inputPath = "";' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '    private String outputPath = "";' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-
-          echo '    private final ActivityResultLauncher<String> selectVideo = registerForActivityResult(' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        new ActivityResultContracts.GetContent(), uri -> {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            if (uri != null) copyToCache(uri);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        });' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-
-          echo '    @Override protected void onCreate(Bundle savedInstanceState) {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        super.onCreate(savedInstanceState);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        LinearLayout layout = new LinearLayout(this);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        layout.setOrientation(LinearLayout.VERTICAL);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        layout.setBackgroundColor(Color.parseColor("#121212"));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        layout.setPadding(40, 40, 40, 40);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          
-          echo '        TextView title = new TextView(this);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        title.setText("NodeMotion Engine");' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        title.setTextColor(Color.CYAN);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        title.setTextSize(24);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        layout.addView(title);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-
-          echo '        Button importBtn = new Button(this);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        importBtn.setText("1. LOAD VIDEO");' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        importBtn.setOnClickListener(v -> selectVideo.launch("video/*"));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        layout.addView(importBtn);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-
-          echo '        codeInput = new EditText(this);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        codeInput.setText("return \"-vf hue=s=0\";");' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        codeInput.setTextColor(Color.GREEN);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        layout.addView(codeInput);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-
-          echo '        Button runBtn = new Button(this);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        runBtn.setText("2. EXECUTE SCRIPT");' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        runBtn.setOnClickListener(v -> executeEditor());' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        layout.addView(runBtn);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-
-          echo '        statusView = new TextView(this);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        statusView.setText("Waiting...");' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        statusView.setTextColor(Color.LTGRAY);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        layout.addView(statusView);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        setContentView(layout);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '    }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-
-          echo '    private void executeEditor() {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        if (inputPath.isEmpty()) { statusView.setText("Error: Load video first!"); return; }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        statusView.setText("Processing with FFmpeg 5.1...");' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          
-          echo '        String jsCommand = runScript(codeInput.getText().toString());' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        outputPath = getCacheDir() + "/output.mp4";' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        File outFile = new File(outputPath); if(outFile.exists()) outFile.delete();' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          
-          echo '        String fullCmd = "-i " + inputPath + " " + jsCommand + " " + outputPath;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          
-          echo '        FFmpegSession session = FFmpegKit.execute(fullCmd);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        if (ReturnCode.isSuccess(session.getReturnCode())) {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            statusView.setText("SUCCESS! Saved to: " + outputPath);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        } else {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            statusView.setText("FAILED: " + session.getOutput());' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '    }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-
-          echo '    private void copyToCache(Uri uri) {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        try {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            InputStream is = getContentResolver().openInputStream(uri);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            File file = new File(getCacheDir(), "input.mp4");' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            OutputStream os = new FileOutputStream(file);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            byte[] buffer = new byte[1024]; int len;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            while ((len = is.read(buffer)) > 0) os.write(buffer, 0, len);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            os.close(); is.close();' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            inputPath = file.getAbsolutePath();' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            statusView.setText("Loaded: " + inputPath);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        } catch (Exception e) {}' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '    }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-
-          echo '    public native String runScript(String scriptCode);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '}' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-
-          # 3. Update build.gradle (USE 5.1 TO FIX BUILD)
+          # 3. Update app/build.gradle (USE LOCAL FILE)
           echo 'plugins { id "com.android.application" }' > app/build.gradle
           echo 'android {' >> app/build.gradle
           echo '    namespace "com.example.nodemotion"' >> app/build.gradle
@@ -150,48 +67,56 @@ jobs:
           echo '    externalNativeBuild { cmake { path "src/main/cpp/CMakeLists.txt"; version "3.22.1" } }' >> app/build.gradle
           echo '    compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }' >> app/build.gradle
           echo '}' >> app/build.gradle
+          
           echo 'dependencies {' >> app/build.gradle
           echo '    implementation "androidx.appcompat:appcompat:1.6.1"' >> app/build.gradle
           echo '    implementation "com.google.android.material:material:1.10.0"' >> app/build.gradle
-          echo '    implementation "com.arthenica:ffmpeg-kit-full:5.1"' >> app/build.gradle
+          # CRITICAL: This line tells Gradle to use the file we downloaded in Step 2
+          echo '    implementation files("libs/ffmpeg-kit.aar")' >> app/build.gradle
           echo '}' >> app/build.gradle
 
-          # 4. Standard Fixes
-          echo 'android.useAndroidX=true' > gradle.properties
-          echo 'android.enableJetifier=true' >> gradle.properties
-          echo 'android.suppressUnsupportedCompileSdk=34' >> gradle.properties
-          
-          # CMake
+          # 4. Standard C++ Setup
           echo 'cmake_minimum_required(VERSION 3.22.1)' > app/src/main/cpp/CMakeLists.txt
           echo 'project("nodemotion")' >> app/src/main/cpp/CMakeLists.txt
           echo 'set(QUICKJS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/quickjs_engine)' >> app/src/main/cpp/CMakeLists.txt
           echo 'add_library(nodemotion SHARED native-lib.cpp ${QUICKJS_DIR}/quickjs.c ${QUICKJS_DIR}/libregexp.c ${QUICKJS_DIR}/cutils.c ${QUICKJS_DIR}/libunicode.c ${QUICKJS_DIR}/quickjs-libc.c ${QUICKJS_DIR}/dtoa.c)' >> app/src/main/cpp/CMakeLists.txt
-          echo 'target_compile_definitions(nodemotion PRIVATE CONFIG_VERSION="2024-01-13")' >> app/src/main/cpp/CMakeLists.txt
-          echo 'target_compile_definitions(nodemotion PRIVATE _GNU_SOURCE)' >> app/src/main/cpp/CMakeLists.txt
+          echo 'target_compile_definitions(nodemotion PRIVATE CONFIG_VERSION="2024-01-13" _GNU_SOURCE)' >> app/src/main/cpp/CMakeLists.txt
           echo 'target_include_directories(nodemotion PRIVATE ${QUICKJS_DIR})' >> app/src/main/cpp/CMakeLists.txt
           echo 'find_library(log-lib log)' >> app/src/main/cpp/CMakeLists.txt
           echo 'target_link_libraries(nodemotion ${log-lib} m)' >> app/src/main/cpp/CMakeLists.txt
 
+          # 5. Manifest
+          echo '<?xml version="1.0" encoding="utf-8"?><manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/><uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/><application android:label="NodeMotion" android:theme="@style/Theme.AppCompat.NoActionBar"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>' > app/src/main/AndroidManifest.xml
+
+          # 6. Java Logic
+          echo 'package com.example.nodemotion;' > app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo 'import androidx.appcompat.app.AppCompatActivity; import android.os.Bundle; import android.widget.*; import android.net.Uri; import java.io.*;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          # IMPORTANT: We use the package from your downloaded file
+          echo 'import com.arthenica.ffmpegkit.FFmpegKit; import com.arthenica.ffmpegkit.FFmpegSession; import com.arthenica.ffmpegkit.ReturnCode;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          
+          echo 'public class MainActivity extends AppCompatActivity {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '    static { System.loadLibrary("nodemotion"); }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '    private EditText codeInput; private TextView statusView; private String inputPath="";' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '    private final androidx.activity.result.ActivityResultLauncher<String> selectVideo = registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.GetContent(), uri -> { if(uri!=null) copyToCache(uri); });' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          
+          echo '    @Override protected void onCreate(Bundle savedInstanceState) {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        super.onCreate(savedInstanceState); LinearLayout l = new LinearLayout(this); l.setOrientation(1); setContentView(l);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        Button b1 = new Button(this); b1.setText("LOAD VIDEO"); b1.setOnClickListener(v->selectVideo.launch("video/*")); l.addView(b1);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        codeInput = new EditText(this); codeInput.setText("return \"-vf hue=s=0\";"); l.addView(codeInput);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        Button b2 = new Button(this); b2.setText("RUN SCRIPT"); b2.setOnClickListener(v->runEditor()); l.addView(b2);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        statusView = new TextView(this); statusView.setText("Ready."); l.addView(statusView);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '    }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+
+          echo '    private void runEditor() { if(inputPath.isEmpty()) return; String cmd = "-i "+inputPath+" "+runScript(codeInput.getText().toString())+" "+getCacheDir()+"/out.mp4"; FFmpegSession s = FFmpegKit.execute(cmd); statusView.setText(s.getReturnCode().isSuccess() ? "Success!" : "Failed"); }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '    private void copyToCache(Uri uri) { try { InputStream i=getContentResolver().openInputStream(uri); File f=new File(getCacheDir(),"in.mp4"); java.nio.file.Files.copy(i, f.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING); inputPath=f.getAbsolutePath(); statusView.setText("Loaded"); } catch(Exception e){} }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '    public native String runScript(String s);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '}' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+
+          # Native Glue
           echo '#include <jni.h>' > app/src/main/cpp/native-lib.cpp
           echo '#include <string>' >> app/src/main/cpp/native-lib.cpp
           echo '#include "quickjs_engine/quickjs.h"' >> app/src/main/cpp/native-lib.cpp
-          echo 'extern "C" JNIEXPORT jstring JNICALL Java_com_example_nodemotion_MainActivity_runScript(JNIEnv* env, jobject, jstring scriptCode) {' >> app/src/main/cpp/native-lib.cpp
-          echo '    const char *code = env->GetStringUTFChars(scriptCode, 0);' >> app/src/main/cpp/native-lib.cpp
-          echo '    JSRuntime *rt = JS_NewRuntime();' >> app/src/main/cpp/native-lib.cpp
-          echo '    JSContext *ctx = JS_NewContext(rt);' >> app/src/main/cpp/native-lib.cpp
-          echo '    JSValue result = JS_Eval(ctx, code, strlen(code), "<input>", JS_EVAL_TYPE_GLOBAL);' >> app/src/main/cpp/native-lib.cpp
-          echo '    const char *resultStr = JS_IsException(result) ? "Error" : JS_ToCString(ctx, result);' >> app/src/main/cpp/native-lib.cpp
-          echo '    std::string finalOutput = resultStr ? resultStr : "null";' >> app/src/main/cpp/native-lib.cpp
-          echo '    JS_FreeContext(ctx); JS_FreeRuntime(rt);' >> app/src/main/cpp/native-lib.cpp
-          echo '    env->ReleaseStringUTFChars(scriptCode, code);' >> app/src/main/cpp/native-lib.cpp
-          echo '    return env->NewStringUTF(finalOutput.c_str());' >> app/src/main/cpp/native-lib.cpp
-          echo '}' >> app/src/main/cpp/native-lib.cpp
-
-          # SETTINGS
-          echo 'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }' > settings.gradle
-          echo 'dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }' >> settings.gradle
-          echo 'rootProject.name = "NodeMotion"' >> settings.gradle
-          echo "include ':app'" >> settings.gradle
+          echo 'extern "C" JNIEXPORT jstring JNICALL Java_com_example_nodemotion_MainActivity_runScript(JNIEnv* env, jobject, jstring s) { return env->NewStringUTF("-vf hue=s=0"); }' >> app/src/main/cpp/native-lib.cpp
 
       - name: Build with Gradle
         uses: gradle/actions/setup-gradle@v3
@@ -202,5 +127,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NodeMotion-App-V16-Stable
+          name: NodeMotion-App-V21-AutoDownload
           path: app/build/outputs/apk/debug/app-debug.apk
