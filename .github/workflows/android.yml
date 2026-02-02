@@ -1,4 +1,4 @@
-name: Build NodeMotion Rescue V37 (Fixed Editor)
+name: Build NodeMotion Rescue V38 (Final Editor Fix)
 
 on: [push, workflow_dispatch]
 
@@ -81,7 +81,7 @@ jobs:
           # 5. Manifest
           echo '<?xml version="1.0" encoding="utf-8"?><manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/><uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/><application android:label="NodeMotion" android:theme="@style/Theme.AppCompat.NoActionBar" android:requestLegacyExternalStorage="true"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>' > app/src/main/AndroidManifest.xml
 
-          # 6. Java Logic (FIXED SYNTAX HIGHLIGHTING)
+          # 6. Java Logic (SYNTAX HIGHLIGHTING + ERROR CHECK)
           echo 'package com.example.nodemotion;' > app/src/main/java/com/example/nodemotion/MainActivity.java
           echo 'import androidx.appcompat.app.AppCompatActivity; import android.os.Bundle; import android.widget.*; import android.view.*; import android.graphics.*; import android.graphics.drawable.*; import android.net.Uri; import java.io.*; import android.content.*; import android.provider.MediaStore; import android.app.AlertDialog; import android.media.MediaMetadataRetriever; import java.util.regex.*; import android.animation.*; import android.view.animation.*; import android.text.*; import android.text.style.*;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo 'import com.arthenica.mobileffmpeg.FFmpeg; import com.arthenica.mobileffmpeg.Config;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
@@ -125,7 +125,7 @@ jobs:
           echo '        setupExportPanel(); setupProgressOverlay(); setContentView(rootLayout);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '    }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
 
-          # FIXED HIGHLIGHTER + ERROR CHECKER
+          # FIXED: Using (char)34 for double quotes to avoid shell escaping errors
           echo '    private void enableSyntaxHighlighting() {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '        codeInput.addTextChangedListener(new TextWatcher() {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '            boolean editing = false;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
@@ -134,13 +134,13 @@ jobs:
           echo '            public void afterTextChanged(Editable s) {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '                if(editing) return; editing = true;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '                clearSpans(s);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          # FIXED ESCAPING: Removed extra backslashes so it compiles correctly
           echo '                highlight(s, "\\b(return|var|const|let|function|if|else)\\b", Color.parseColor("#C678DD"));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '                highlight(s, "\".*?\"", Color.parseColor("#98C379"));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '                highlight(s, "//.*", Color.parseColor("#7F848E"));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '                highlight(s, "-[a-zA-Z:]+", Color.parseColor("#61AFEF"));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '                highlight(s, "\\b\\d+\\b", Color.parseColor("#D19A66"));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '                if(countChar(s.toString(), \x27"\x27) % 2 != 0) codeInput.setError("Unclosed String"); else codeInput.setError(null);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          # CRITICAL FIX: Using (char)34 instead of escaped quotes
+          echo '                if(countChar(s.toString(), (char)34) % 2 != 0) codeInput.setError("Unclosed String"); else codeInput.setError(null);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '                editing = false;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '            }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '        });' >> app/src/main/java/com/example/nodemotion/MainActivity.java
@@ -197,5 +197,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NodeMotion-V37-FixedEditor
+          name: NodeMotion-V38-FinalEditor
           path: app/build/outputs/apk/debug/app-debug.apk
