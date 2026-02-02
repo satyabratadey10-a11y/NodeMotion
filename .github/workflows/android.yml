@@ -1,4 +1,4 @@
-name: Build NodeMotion Rescue V36 (Code Editor)
+name: Build NodeMotion Rescue V37 (Fixed Editor)
 
 on: [push, workflow_dispatch]
 
@@ -81,7 +81,7 @@ jobs:
           # 5. Manifest
           echo '<?xml version="1.0" encoding="utf-8"?><manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/><uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/><application android:label="NodeMotion" android:theme="@style/Theme.AppCompat.NoActionBar" android:requestLegacyExternalStorage="true"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>' > app/src/main/AndroidManifest.xml
 
-          # 6. Java Logic (SYNTAX HIGHLIGHTING ENGINE)
+          # 6. Java Logic (FIXED SYNTAX HIGHLIGHTING)
           echo 'package com.example.nodemotion;' > app/src/main/java/com/example/nodemotion/MainActivity.java
           echo 'import androidx.appcompat.app.AppCompatActivity; import android.os.Bundle; import android.widget.*; import android.view.*; import android.graphics.*; import android.graphics.drawable.*; import android.net.Uri; import java.io.*; import android.content.*; import android.provider.MediaStore; import android.app.AlertDialog; import android.media.MediaMetadataRetriever; import java.util.regex.*; import android.animation.*; import android.view.animation.*; import android.text.*; import android.text.style.*;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo 'import com.arthenica.mobileffmpeg.FFmpeg; import com.arthenica.mobileffmpeg.Config;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
@@ -102,25 +102,16 @@ jobs:
           echo '        super.onCreate(savedInstanceState);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '        rootLayout = new FrameLayout(this); rootLayout.setBackgroundColor(Color.parseColor("#0F0F0F"));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           
-          # VIDEO
-          echo '        videoPreview = new VideoView(this);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        videoPreview.setOnErrorListener((mp, what, extra) -> { statusView.setText("Preview unavailable (Too High Res)"); return true; });' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        videoPreview = new VideoView(this); videoPreview.setOnErrorListener((mp, what, extra) -> { statusView.setText("Preview Unavailable"); return true; });' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '        FrameLayout.LayoutParams vpParams = new FrameLayout.LayoutParams(-1, 800); vpParams.gravity = Gravity.CENTER; videoPreview.setLayoutParams(vpParams); rootLayout.addView(videoPreview);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           
-          # CODE EDITOR (Advanced)
-          echo '        codeInput = new EditText(this); codeInput.setText("return \"-vf hue=s=0\";");' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        codeInput.setBackgroundColor(Color.parseColor("#1E1E1E"));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        codeInput.setTextColor(Color.WHITE);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        codeInput.setTypeface(Typeface.MONOSPACE);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        codeInput.setPadding(30,30,30,30); codeInput.setVisibility(View.GONE);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        codeInput = new EditText(this); codeInput.setText("return \"-vf hue=s=0\"; // Comment"); codeInput.setBackgroundColor(Color.parseColor("#1E1E1E")); codeInput.setTextColor(Color.WHITE); codeInput.setTypeface(Typeface.MONOSPACE); codeInput.setPadding(30,30,30,30); codeInput.setVisibility(View.GONE);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '        enableSyntaxHighlighting();' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '        FrameLayout.LayoutParams cp = new FrameLayout.LayoutParams(-1, 500); cp.gravity = Gravity.TOP; cp.topMargin = 150; codeInput.setLayoutParams(cp); rootLayout.addView(codeInput);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
 
-          # UI LAYERS
           echo '        LinearLayout mainUI = new LinearLayout(this); mainUI.setOrientation(1); mainUI.setGravity(Gravity.BOTTOM);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '        statusView = new TextView(this); statusView.setText("Welcome"); statusView.setTextColor(Color.WHITE); statusView.setPadding(40, 20, 40, 20); statusView.setBackground(makeRoundDrawable("#333333", 50)); LinearLayout.LayoutParams stParams = new LinearLayout.LayoutParams(-2,-2); stParams.gravity = Gravity.CENTER; stParams.setMargins(0,50,0,0); statusView.setLayoutParams(stParams); rootLayout.addView(statusView);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           
-          # CONTROL BAR
           echo '        LinearLayout controls = new LinearLayout(this); controls.setGravity(17); controls.setPadding(0,0,0,20);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '        controls.addView(createRoundButton("▶", "#444444", v->videoPreview.start()));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '        controls.addView(new View(this){{setLayoutParams(new LinearLayout.LayoutParams(20,1));}});' >> app/src/main/java/com/example/nodemotion/MainActivity.java
@@ -129,15 +120,12 @@ jobs:
           echo '        controls.addView(createRoundButton("📝 CODE", "#61AFEF", v->{ isCodeVisible=!isCodeVisible; codeInput.setVisibility(isCodeVisible?View.VISIBLE:View.GONE); }));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '        mainUI.addView(controls);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
 
-          # DOCK
           echo '        LinearLayout dock = new LinearLayout(this); dock.setOrientation(0); dock.setGravity(17); dock.setPadding(40,40,40,60); dock.addView(createModernButton("📂 LOAD", "#333333", v->selectVideo.launch("video/*"))); dock.addView(new View(this){{setLayoutParams(new LinearLayout.LayoutParams(30,1));}}); dock.addView(createModernButton("✨ EXPORT", "#00E5FF", v->toggleExportPanel(true))); mainUI.addView(dock); rootLayout.addView(mainUI);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          
-          # OVERLAYS
           echo '        dimOverlay = new View(this); dimOverlay.setBackgroundColor(Color.parseColor("#CC000000")); dimOverlay.setAlpha(0); dimOverlay.setVisibility(View.GONE); dimOverlay.setOnClickListener(v->toggleExportPanel(false)); rootLayout.addView(dimOverlay);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '        setupExportPanel(); setupProgressOverlay(); setContentView(rootLayout);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '    }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
 
-          # SYNTAX HIGHLIGHTER LOGIC
+          # FIXED HIGHLIGHTER + ERROR CHECKER
           echo '    private void enableSyntaxHighlighting() {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '        codeInput.addTextChangedListener(new TextWatcher() {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '            boolean editing = false;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
@@ -146,15 +134,19 @@ jobs:
           echo '            public void afterTextChanged(Editable s) {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '                if(editing) return; editing = true;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '                clearSpans(s);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '                highlight(s, "\\\\b(return|var|const|let|function|if|else)\\\\b", Color.parseColor("#C678DD"));' >> app/src/main/java/com/example/nodemotion/MainActivity.java # Purple Keywords
-          echo '                highlight(s, "\\".*?\\"", Color.parseColor("#98C379"));' >> app/src/main/java/com/example/nodemotion/MainActivity.java # Green Strings
-          echo '                highlight(s, "-[a-zA-Z:]+", Color.parseColor("#61AFEF"));' >> app/src/main/java/com/example/nodemotion/MainActivity.java # Blue Flags
-          echo '                highlight(s, "\\\\b\\\\d+\\\\b", Color.parseColor("#D19A66"));' >> app/src/main/java/com/example/nodemotion/MainActivity.java # Orange Numbers
+          # FIXED ESCAPING: Removed extra backslashes so it compiles correctly
+          echo '                highlight(s, "\\b(return|var|const|let|function|if|else)\\b", Color.parseColor("#C678DD"));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '                highlight(s, "\".*?\"", Color.parseColor("#98C379"));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '                highlight(s, "//.*", Color.parseColor("#7F848E"));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '                highlight(s, "-[a-zA-Z:]+", Color.parseColor("#61AFEF"));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '                highlight(s, "\\b\\d+\\b", Color.parseColor("#D19A66"));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '                if(countChar(s.toString(), \x27"\x27) % 2 != 0) codeInput.setError("Unclosed String"); else codeInput.setError(null);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '                editing = false;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '            }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '        });' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '    }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           
+          echo '    private int countChar(String s, char c) { int count=0; for(int i=0; i<s.length(); i++) if(s.charAt(i)==c) count++; return count; }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '    private void clearSpans(Editable s) { ForegroundColorSpan[] spans = s.getSpans(0, s.length(), ForegroundColorSpan.class); for(ForegroundColorSpan span : spans) s.removeSpan(span); }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '    private void highlight(Editable s, String pattern, int color) { Matcher m = Pattern.compile(pattern).matcher(s); while(m.find()) { s.setSpan(new ForegroundColorSpan(color), m.start(), m.end(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE); } }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
 
@@ -205,5 +197,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NodeMotion-V36-Editor
+          name: NodeMotion-V37-FixedEditor
           path: app/build/outputs/apk/debug/app-debug.apk
