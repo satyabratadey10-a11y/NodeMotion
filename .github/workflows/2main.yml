@@ -1,4 +1,4 @@
-name: Build NodeMotion Rescue V28 (MediaStore Fix)
+name: Build NodeMotion Rescue V31 (Final UI)
 
 on: [push, workflow_dispatch]
 
@@ -81,55 +81,115 @@ jobs:
           # 5. Manifest
           echo '<?xml version="1.0" encoding="utf-8"?><manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/><uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/><application android:label="NodeMotion" android:theme="@style/Theme.AppCompat.NoActionBar" android:requestLegacyExternalStorage="true"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>' > app/src/main/AndroidManifest.xml
 
-          # 6. Java Logic (MODERN MEDIASTORE SAVE)
+          # 6. Java Logic (COMPLETE UI FLOW)
           echo 'package com.example.nodemotion;' > app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo 'import androidx.appcompat.app.AppCompatActivity; import android.os.Bundle; import android.widget.*; import android.net.Uri; import java.io.*; import android.content.*; import android.provider.MediaStore;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo 'import androidx.appcompat.app.AppCompatActivity; import android.os.Bundle; import android.widget.*; import android.view.*; import android.graphics.Color; import android.net.Uri; import java.io.*; import android.content.*; import android.provider.MediaStore; import android.app.AlertDialog;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo 'import com.arthenica.mobileffmpeg.FFmpeg; import com.arthenica.mobileffmpeg.Config;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           
           echo 'public class MainActivity extends AppCompatActivity {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '    static { System.loadLibrary("nodemotion"); }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '    private EditText codeInput; private TextView statusView; private String inputPath="";' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '    private final androidx.activity.result.ActivityResultLauncher<String> selectVideo = registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.GetContent(), uri -> { if(uri!=null) copyToCache(uri); });' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '    private VideoView videoPreview; private TextView statusView; private String inputPath="";' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '    private String selectedRes = "Original"; private String selectedFps = "Original"; private String selectedBit = "Auto"; private String ccPath = "";' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '    private AlertDialog progressDialog; private TextView progressText;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          
+          echo '    private final androidx.activity.result.ActivityResultLauncher<String> selectVideo = registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.GetContent(), uri -> { if(uri!=null) copyToCache(uri, "in.mp4"); });' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '    private final androidx.activity.result.ActivityResultLauncher<String> selectCC = registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.GetContent(), uri -> { if(uri!=null) copyToCache(uri, "lut.cube"); });' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           
           echo '    @Override protected void onCreate(Bundle savedInstanceState) {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        super.onCreate(savedInstanceState); LinearLayout l = new LinearLayout(this); l.setOrientation(1); setContentView(l);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        Button b1 = new Button(this); b1.setText("LOAD VIDEO"); b1.setOnClickListener(v->selectVideo.launch("video/*")); l.addView(b1);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        codeInput = new EditText(this); codeInput.setText("return \"-vf hue=s=0\";"); l.addView(codeInput);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        Button b2 = new Button(this); b2.setText("RUN SCRIPT"); b2.setOnClickListener(v->runEditor()); l.addView(b2);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        statusView = new TextView(this); statusView.setText("Ready."); l.addView(statusView);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        super.onCreate(savedInstanceState);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        LinearLayout main = new LinearLayout(this); main.setOrientation(1); main.setBackgroundColor(Color.parseColor("#101010"));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          
+          # PREVIEW SCREEN
+          echo '        videoPreview = new VideoView(this);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        LinearLayout.LayoutParams vp = new LinearLayout.LayoutParams(-1, 800); videoPreview.setLayoutParams(vp); main.addView(videoPreview);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          
+          # CONTROLS
+          echo '        LinearLayout ctl = new LinearLayout(this); ctl.setGravity(17); ctl.setPadding(0,20,0,20);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        Button b1 = new Button(this); b1.setText("📂 LOAD"); b1.setOnClickListener(v->selectVideo.launch("video/*"));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        Button b2 = new Button(this); b2.setText("⚙ EXPORT"); b2.setBackgroundColor(Color.CYAN); b2.setTextColor(Color.BLACK); b2.setOnClickListener(v->showExportSettings());' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        ctl.addView(b1); ctl.addView(b2); main.addView(ctl);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          
+          # SIMPLE STATUS
+          echo '        statusView = new TextView(this); statusView.setText("Ready"); statusView.setTextColor(Color.DKGRAY); statusView.setGravity(17); main.addView(statusView);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        setContentView(main);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '    }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
 
-          echo '    private void runEditor() { if(inputPath.isEmpty()) { statusView.setText("No Video"); return; } statusView.setText("Running..."); new Thread(() -> {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        try { String cmd = "-i "+inputPath+" "+runScript(codeInput.getText().toString())+" -y "+getCacheDir()+"/out.mp4"; int rc = FFmpeg.execute(cmd);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            if(rc == Config.RETURN_CODE_SUCCESS) { saveToGallery(); }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            else { runOnUiThread(() -> statusView.setText("Failed code: " + rc)); }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        } catch(Exception e) { runOnUiThread(() -> statusView.setText("Error: " + e.getMessage())); } }).start(); }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          # 1. EXPORT SETTINGS WINDOW
+          echo '    private void showExportSettings() {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        AlertDialog.Builder b = new AlertDialog.Builder(this); b.setTitle("Export Settings");' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        LinearLayout l = new LinearLayout(this); l.setOrientation(1); l.setPadding(50,20,50,20);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           
-          # THIS IS THE MODERN SAVE TRICK
-          echo '    private void saveToGallery() {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        try {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            File in = new File(getCacheDir(), "out.mp4");' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            ContentValues values = new ContentValues();' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            values.put(MediaStore.Video.Media.DISPLAY_NAME, "NodeMotion_" + System.currentTimeMillis() + ".mp4");' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            values.put(MediaStore.Video.Media.MIME_TYPE, "video/mp4");' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          # This line creates the "NodeMotion" folder inside "Movies"
-          echo '            values.put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/NodeMotion");' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            Uri uri = getContentResolver().insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            OutputStream out = getContentResolver().openOutputStream(uri);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            java.nio.file.Files.copy(in.toPath(), out); out.close();' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '            runOnUiThread(() -> statusView.setText("SAVED to Gallery! Check Movies/NodeMotion folder"));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
-          echo '        } catch(Exception e) { runOnUiThread(() -> statusView.setText("Save Error: " + e.getMessage())); }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        l.addView(new TextView(this){{setText("Resolution:");}});' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        Spinner spRes = new Spinner(this); spRes.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, new String[]{"Original", "480p", "720p", "1080p", "1440p", "2160p"}));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        l.addView(spRes);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          
+          echo '        l.addView(new TextView(this){{setText("FPS:");}});' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        Spinner spFps = new Spinner(this); spFps.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, new String[]{"Original", "24", "30", "60", "90"}));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        l.addView(spFps);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+
+          echo '        l.addView(new TextView(this){{setText("Bitrate:");}});' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        Spinner spBit = new Spinner(this); spBit.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, new String[]{"Auto", "4M", "8M", "12M", "16M", "30M"}));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        l.addView(spBit);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          
+          echo '        Button btnCC = new Button(this); btnCC.setText("🎨 Load Custom CC"); btnCC.setOnClickListener(v->selectCC.launch("*/*")); l.addView(btnCC);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+
+          echo '        b.setView(l);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        b.setNegativeButton("CANCEL", (d,w) -> d.dismiss());' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        b.setPositiveButton("EXPORT", (d,w) -> {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '            selectedRes=spRes.getSelectedItem().toString(); selectedFps=spFps.getSelectedItem().toString(); selectedBit=spBit.getSelectedItem().toString();' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '            runExportProcess();' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        });' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        b.show();' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '    }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+
+          # 2. PROGRESS WINDOW
+          echo '    private void showProgressWindow() {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        AlertDialog.Builder b = new AlertDialog.Builder(this); b.setCancelable(false);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        LinearLayout l = new LinearLayout(this); l.setOrientation(1); l.setPadding(60,60,60,60); l.setGravity(17);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        ProgressBar pb = new ProgressBar(this); l.addView(pb);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        progressText = new TextView(this); progressText.setText("Processing Video..."); progressText.setTextSize(18); progressText.setPadding(0,30,0,0); l.addView(progressText);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        b.setView(l); progressDialog = b.create(); progressDialog.show();' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '    }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+
+          # 3. EXPORT LOGIC
+          echo '    private void runExportProcess() {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        if(inputPath.isEmpty()){Toast.makeText(this,"Load Video First!",Toast.LENGTH_SHORT).show();return;}' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        showProgressWindow();' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        new Thread(() -> {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '            try {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '                String vf = "";' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '                if(!selectedRes.equals("Original")) { String h=selectedRes.replace("p",""); vf+="scale=-2:"+h; }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '                if(!ccPath.isEmpty()) { if(!vf.isEmpty()) vf+=","; vf+="lut3d="+ccPath; }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '                String cmd = "-i "+inputPath;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '                if(!vf.isEmpty()) cmd+=" -vf "+vf;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '                if(!selectedFps.equals("Original")) cmd+=" -r "+selectedFps;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '                if(!selectedBit.equals("Auto")) cmd+=" -b:v "+selectedBit;' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '                cmd+=" -c:a copy -y "+getCacheDir()+"/out.mp4";' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          
+          echo '                int rc = FFmpeg.execute(cmd);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '                if(rc == Config.RETURN_CODE_SUCCESS) {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '                    saveToGallery();' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '                    runOnUiThread(() -> progressText.setText("Successfully Exported"));' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '                    Thread.sleep(1000);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '                    runOnUiThread(() -> progressDialog.dismiss());' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '                } else {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '                    runOnUiThread(() -> { progressText.setText("Failed: " + rc); progressDialog.setCancelable(true); });' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '                }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '            } catch(Exception e) { runOnUiThread(() -> progressText.setText("Err: "+e.getMessage())); }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        }).start();' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '    }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           
-          echo '    private void copyToCache(Uri uri) { try { InputStream i=getContentResolver().openInputStream(uri); File f=new File(getCacheDir(),"in.mp4"); java.nio.file.Files.copy(i, f.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING); inputPath=f.getAbsolutePath(); statusView.setText("Loaded"); } catch(Exception e){} }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '    private void saveToGallery() {' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          echo '        try { File in = new File(getCacheDir(), "out.mp4"); ContentValues v = new ContentValues(); v.put(MediaStore.Video.Media.DISPLAY_NAME, "NM_"+System.currentTimeMillis()+".mp4"); v.put(MediaStore.Video.Media.MIME_TYPE, "video/mp4"); v.put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/NodeMotion"); Uri u = getContentResolver().insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, v); OutputStream o = getContentResolver().openOutputStream(u); java.nio.file.Files.copy(in.toPath(), o); o.close(); } catch(Exception e) {} }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
+          
+          echo '    private void copyToCache(Uri uri, String name) { try { InputStream i=getContentResolver().openInputStream(uri); File f=new File(getCacheDir(),name); java.nio.file.Files.copy(i, f.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING); if(name.equals("in.mp4")){inputPath=f.getAbsolutePath(); videoPreview.setVideoPath(inputPath); videoPreview.start();} else {ccPath=f.getAbsolutePath(); statusView.setText("CC Loaded");} } catch(Exception e){} }' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '    public native String runScript(String s);' >> app/src/main/java/com/example/nodemotion/MainActivity.java
           echo '}' >> app/src/main/java/com/example/nodemotion/MainActivity.java
 
           # Native Glue
           echo '#include <jni.h>' > app/src/main/cpp/native-lib.cpp
           echo '#include <string>' >> app/src/main/cpp/native-lib.cpp
-          echo '#include "quickjs_engine/quickjs.h"' >> app/src/main/cpp/native-lib.cpp
-          echo 'extern "C" JNIEXPORT jstring JNICALL Java_com_example_nodemotion_MainActivity_runScript(JNIEnv* env, jobject, jstring s) { return env->NewStringUTF("-vf hue=s=0"); }' >> app/src/main/cpp/native-lib.cpp
+          echo 'extern "C" JNIEXPORT jstring JNICALL Java_com_example_nodemotion_MainActivity_runScript(JNIEnv* env, jobject, jstring s) { return env->NewStringUTF(""); }' >> app/src/main/cpp/native-lib.cpp
 
       - name: Build with Gradle
         uses: gradle/actions/setup-gradle@v3
@@ -140,5 +200,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NodeMotion-V28-MediaStore
+          name: NodeMotion-V31-FinalUI
           path: app/build/outputs/apk/debug/app-debug.apk
